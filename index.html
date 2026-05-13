@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SecureBot Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root {
+            --tg-theme-bg-color: #ffffff;
+            --tg-theme-text-color: #0f172a;
+            --tg-theme-muted: #64748b;
+            --tg-theme-surface: #f8fafc;
+            --tg-theme-card: #ffffff;
+            --tg-theme-border: #e2e8f0;
+            --tg-theme-primary: #2563eb;
+        }
+
+        .tg-theme-dark {
+            --tg-theme-bg-color: #0f172a;
+            --tg-theme-text-color: #e2e8f0;
+            --tg-theme-muted: #94a3b8;
+            --tg-theme-surface: #111827;
+            --tg-theme-card: #1f2937;
+            --tg-theme-border: #334155;
+            --tg-theme-primary: #60a5fa;
+        }
+
+        body {
+            background: var(--tg-theme-bg-color);
+            color: var(--tg-theme-text-color);
+        }
+
+        .card {
+            background: var(--tg-theme-card);
+            border: 1px solid var(--tg-theme-border);
+        }
+
+        .text-muted {
+            color: var(--tg-theme-muted);
+        }
+
+        .badge {
+            background: rgba(37, 99, 235, .1);
+            color: #1d4ed8;
+        }
+
+        .button-primary {
+            background-color: var(--tg-theme-primary);
+            color: #ffffff;
+        }
+
+        .button-primary:hover {
+            background-color: #1d4ed8;
+        }
+
+        .spinner {
+            border: 3px solid rgba(148, 163, 184, .2);
+            border-top: 3px solid var(--tg-theme-primary);
+            border-radius: 50%;
+            width: 28px;
+            height: 28px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4 sm:p-6">
+    <div id="loading" class="max-w-3xl mx-auto py-12 text-center">
+        <div class="spinner"></div>
+        <p class="mt-4 text-sm text-muted">Connecting to SecureBot dashboard...</p>
+    </div>
+
+    <div id="error-screen" class="hidden max-w-3xl mx-auto rounded-3xl card p-6">
+        <h1 class="text-xl font-semibold mb-2">Something went wrong</h1>
+        <p class="text-sm text-muted mb-4" id="error-message"></p>
+    </div>
+
+    <div id="groups-screen" class="hidden max-w-3xl mx-auto space-y-4">
+        <div class="flex items-center justify-between mb-2">
+            <div>
+                <p class="text-sm text-muted">Private dashboard</p>
+                <h1 class="text-2xl font-semibold">Select a group</h1>
+            </div>
+            <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold tracking-wide text-white badge">
+                SecureBot
+            </span>
+        </div>
+
+        <div id="group-list" class="space-y-3"></div>
+
+        <div id="no-groups" class="hidden rounded-3xl card p-5">
+            <p class="text-sm text-muted">No groups found where you are an admin and the bot is present.</p>
+        </div>
+    </div>
+
+    <div id="settings-screen" class="hidden max-w-3xl mx-auto space-y-4">
+        <button id="back-button" class="inline-flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+            ⬅️ Back to Groups
+        </button>
+
+        <div class="rounded-3xl card p-5">
+            <p class="text-sm text-muted">Selected group</p>
+            <h2 class="mt-1 text-2xl font-semibold" id="selected-group-title"></h2>
+            <p class="mt-2 text-sm text-muted">Manage settings and view recent statistics for this group.</p>
+        </div>
+
+        <div class="grid gap-4">
+            <div class="rounded-3xl card p-5">
+                <h3 class="text-lg font-semibold mb-4">Statistics</h3>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="rounded-3xl border border-slate-200 dark:border-slate-700 p-4">
+                        <p class="text-3xl font-semibold" id="links-scanned">0</p>
+                        <p class="text-sm text-muted mt-2">Links scanned</p>
+                    </div>
+                    <div class="rounded-3xl border border-slate-200 dark:border-slate-700 p-4">
+                        <p class="text-3xl font-semibold" id="threats-blocked">0</p>
+                        <p class="text-sm text-muted mt-2">Threats blocked</p>
+                    </div>
+                    <div class="rounded-3xl border border-slate-200 dark:border-slate-700 p-4">
+                        <p class="text-3xl font-semibold" id="groups-protected">0</p>
+                        <p class="text-sm text-muted mt-2">Total groups tracked</p>
+                    </div>
+                    <div class="rounded-3xl border border-slate-200 dark:border-slate-700 p-4">
+                        <p class="text-3xl font-semibold" id="apks-scanned">0</p>
+                        <p class="text-sm text-muted mt-2">APKs scanned</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rounded-3xl card p-5">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <h3 class="text-lg font-semibold">Group settings</h3>
+                        <p class="text-sm text-muted">Toggle the configuration for the selected group.</p>
+                    </div>
+                    <button id="save-settings" class="rounded-full button-primary px-4 py-2 text-sm font-semibold">
+                        Save changes
+                    </button>
+                </div>
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between gap-4">
+                        <span>Bot enabled</span>
+                        <label for="enabled" class="inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="enabled" class="sr-only peer">
+                            <div class="w-12 h-6 rounded-full bg-slate-200 dark:bg-slate-600 relative transition-colors duration-200 peer-checked:bg-sky-500 after:absolute after:top-0.5 after:left-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow-sm after:transition-transform after:duration-200 peer-checked:after:translate-x-6 pointer-events-none"></div>
+                        </label>
+                    </div>
+                    <div class="flex items-center justify-between gap-4">
+                        <span>Delete high risk</span>
+                        <label for="delete_high" class="inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="delete_high" class="sr-only peer">
+                            <div class="w-12 h-6 rounded-full bg-slate-200 dark:bg-slate-600 relative transition-colors duration-200 peer-checked:bg-sky-500 after:absolute after:top-0.5 after:left-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow-sm after:transition-transform after:duration-200 peer-checked:after:translate-x-6 pointer-events-none"></div>
+                        </label>
+                    </div>
+                    <div class="flex items-center justify-between gap-4">
+                        <span>Warn medium risk</span>
+                        <label for="warn_medium" class="inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="warn_medium" class="sr-only peer">
+                            <div class="w-12 h-6 rounded-full bg-slate-200 dark:bg-slate-600 relative transition-colors duration-200 peer-checked:bg-sky-500 after:absolute after:top-0.5 after:left-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow-sm after:transition-transform after:duration-200 peer-checked:after:translate-x-6 pointer-events-none"></div>
+                        </label>
+                    </div>
+                    <div class="flex items-center justify-between gap-4">
+                        <span>Reply low risk</span>
+                        <label for="reply_low" class="inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="reply_low" class="sr-only peer">
+                            <div class="w-12 h-6 rounded-full bg-slate-200 dark:bg-slate-600 relative transition-colors duration-200 peer-checked:bg-sky-500 after:absolute after:top-0.5 after:left-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow-sm after:transition-transform after:duration-200 peer-checked:after:translate-x-6 pointer-events-none"></div>
+                        </label>
+                    </div>
+                    <div class="flex items-center justify-between gap-4">
+                        <span>Scan links</span>
+                        <label for="scan_links" class="inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="scan_links" class="sr-only peer">
+                            <div class="w-12 h-6 rounded-full bg-slate-200 dark:bg-slate-600 relative transition-colors duration-200 peer-checked:bg-sky-500 after:absolute after:top-0.5 after:left-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow-sm after:transition-transform after:duration-200 peer-checked:after:translate-x-6 pointer-events-none"></div>
+                        </label>
+                    </div>
+                    <div class="flex items-center justify-between gap-4">
+                        <span>Scan APK files</span>
+                        <label for="scan_apk" class="inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="scan_apk" class="sr-only peer">
+                            <div class="w-12 h-6 rounded-full bg-slate-200 dark:bg-slate-600 relative transition-colors duration-200 peer-checked:bg-sky-500 after:absolute after:top-0.5 after:left-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow-sm after:transition-transform after:duration-200 peer-checked:after:translate-x-6 pointer-events-none"></div>
+                        </label>
+                    </div>
+                    <div class="flex items-center justify-between gap-4">
+                        <span>Mute high risk</span>
+                        <label for="mute_high_risk" class="inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="mute_high_risk" class="sr-only peer">
+                            <div class="w-12 h-6 rounded-full bg-slate-200 dark:bg-slate-600 relative transition-colors duration-200 peer-checked:bg-sky-500 after:absolute after:top-0.5 after:left-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow-sm after:transition-transform after:duration-200 peer-checked:after:translate-x-6 pointer-events-none"></div>
+                        </label>
+                    </div>
+                    <div class="flex items-center justify-between gap-4">
+                        <span>Ban high risk</span>
+                        <label for="ban_high_risk" class="inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="ban_high_risk" class="sr-only peer">
+                            <div class="w-12 h-6 rounded-full bg-slate-200 dark:bg-slate-600 relative transition-colors duration-200 peer-checked:bg-sky-500 after:absolute after:top-0.5 after:left-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow-sm after:transition-transform after:duration-200 peer-checked:after:translate-x-6 pointer-events-none"></div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rounded-3xl card p-5">
+                <h3 class="text-lg font-semibold mb-4">Whitelist manager</h3>
+                <div class="space-y-4">
+                    <div class="grid gap-2 sm:grid-cols-[1fr_auto]">
+                        <input id="new-user-id" type="number" placeholder="User ID" class="w-full rounded-3xl border border-slate-200 dark:border-slate-700 bg-surface px-4 py-3 text-sm text-slate-900 dark:text-slate-100 focus:outline-none">
+                        <button id="add-user" class="rounded-3xl button-primary px-4 py-3 text-sm font-semibold">Add</button>
+                    </div>
+                    <div id="whitelist-list" class="space-y-3"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        const initData = tg.initData;
+        let selectedChatId = null;
+        let currentWhitelist = [];
+
+        function init() {
+            tg.ready();
+            tg.expand();
+            applyTheme();
+
+            if (!initData) {
+                showError('Unable to authenticate the dashboard. Please reopen from Telegram.');
+                return;
+            }
+
+            fetchGroups();
+        }
+
+        function applyTheme() {
+            document.body.classList.toggle('tg-theme-dark', tg.colorScheme === 'dark');
+            if (tg.themeParams) {
+                const params = tg.themeParams;
+                document.documentElement.style.setProperty('--tg-theme-bg-color', params.bg_color || '#ffffff');
+                document.documentElement.style.setProperty('--tg-theme-text-color', params.text_color || '#0f172a');
+                document.documentElement.style.setProperty('--tg-theme-muted', params.hint_color || '#64748b');
+                document.documentElement.style.setProperty('--tg-theme-surface', params.secondary_bg_color || '#f8fafc');
+                document.documentElement.style.setProperty('--tg-theme-card', params.button_color || '#ffffff');
+                document.documentElement.style.setProperty('--tg-theme-border', params.text_color || '#e2e8f0');
+                document.documentElement.style.setProperty('--tg-theme-primary', params.link_color || '#2563eb');
+            }
+        }
+
+        async function fetchGroups() {
+            showScreen('loading');
+            try {
+                const response = await fetch(`/api/my-groups?init_data=${encodeURIComponent(initData)}`);
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || 'Unable to load groups');
+                renderGroupList(data.groups || []);
+            } catch (err) {
+                showError(err.message || 'Failed to load groups.');
+            }
+        }
+
+        function renderGroupList(groups) {
+            const list = document.getElementById('group-list');
+            list.innerHTML = '';
+
+            if (!groups.length) {
+                document.getElementById('no-groups').classList.remove('hidden');
+                document.getElementById('groups-screen').classList.remove('hidden');
+                document.getElementById('loading').classList.add('hidden');
+                return;
+            }
+
+            document.getElementById('no-groups').classList.add('hidden');
+            groups.forEach(group => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'w-full rounded-3xl card p-4 text-left hover:border-slate-300 dark:hover:border-slate-600 transition-colors';
+                button.innerHTML = `
+                    <div class="flex items-center justify-between gap-3">
+                        <div>
+                            <p class="text-base font-semibold">${escapeHtml(group.chat_title)}</p>
+                            <p class="text-sm text-muted">ID: ${group.chat_id}</p>
+                        </div>
+                        <span class="inline-flex rounded-full bg-slate-100 dark:bg-slate-700 px-3 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200">Manage</span>
+                    </div>
+                `;
+                button.addEventListener('click', () => selectGroup(group));
+                list.appendChild(button);
+            });
+
+            showScreen('groups');
+        }
+
+        async function selectGroup(group) {
+            selectedChatId = group.chat_id;
+            document.getElementById('selected-group-title').textContent = group.chat_title;
+            await loadGroupSettings(group.chat_id);
+        }
+
+        async function loadGroupSettings(chatId) {
+            showScreen('loading');
+            try {
+                const response = await fetch(`/api/settings?chat_id=${chatId}&init_data=${encodeURIComponent(initData)}`);
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || 'Unable to load group data');
+
+                currentWhitelist = data.whitelist || [];
+                populateSettings(data.settings);
+                populateStats(data.stats);
+                populateWhitelist(currentWhitelist);
+                showScreen('settings');
+            } catch (err) {
+                showError(err.message || 'Failed to load group settings.');
+            }
+        }
+
+        function populateSettings(settings) {
+            ['enabled', 'delete_high', 'warn_medium', 'reply_low', 'scan_links', 'scan_apk', 'mute_high_risk', 'ban_high_risk']
+                .forEach(key => {
+                    const checkbox = document.getElementById(key);
+                    if (checkbox) checkbox.checked = Boolean(settings[key]);
+                });
+        }
+
+        function populateStats(stats) {
+            document.getElementById('links-scanned').textContent = stats.links_scanned || 0;
+            document.getElementById('threats-blocked').textContent = stats.threats_blocked || 0;
+            document.getElementById('groups-protected').textContent = stats.groups_protected || 0;
+            document.getElementById('apks-scanned').textContent = stats.apks_scanned || 0;
+        }
+
+        function populateWhitelist(list) {
+            const container = document.getElementById('whitelist-list');
+            container.innerHTML = '';
+
+            if (!list.length) {
+                container.innerHTML = '<div class="rounded-3xl border border-slate-200 dark:border-slate-700 p-4 text-sm text-muted">No whitelisted users yet.</div>';
+                return;
+            }
+
+            list.forEach(userId => {
+                const card = document.createElement('div');
+                card.className = 'flex items-center justify-between rounded-3xl border border-slate-200 dark:border-slate-700 p-4';
+                card.innerHTML = `
+                    <span class="text-sm font-mono">${userId}</span>
+                    <button type="button" class="text-sm font-semibold text-red-600 dark:text-red-400" onclick="removeUser(${userId})">Remove</button>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        async function saveSettings() {
+            if (!selectedChatId) return;
+            const button = document.getElementById('save-settings');
+            button.disabled = true;
+            button.textContent = 'Saving...';
+            try {
+                const payload = {
+                    chat_id: selectedChatId,
+                    init_data: initData,
+                    settings: {
+                        enabled: document.getElementById('enabled').checked ? 1 : 0,
+                        delete_high: document.getElementById('delete_high').checked ? 1 : 0,
+                        warn_medium: document.getElementById('warn_medium').checked ? 1 : 0,
+                        reply_low: document.getElementById('reply_low').checked ? 1 : 0,
+                        scan_links: document.getElementById('scan_links').checked ? 1 : 0,
+                        scan_apk: document.getElementById('scan_apk').checked ? 1 : 0,
+                        mute_high_risk: document.getElementById('mute_high_risk').checked ? 1 : 0,
+                        ban_high_risk: document.getElementById('ban_high_risk').checked ? 1 : 0,
+                    }
+                };
+                const response = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || 'Failed to save settings');
+                tg.showAlert('Settings saved successfully');
+            } catch (err) {
+                console.error(err);
+                tg.showAlert('Unable to save settings');
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Save changes';
+            }
+        }
+
+        async function addUser() {
+            if (!selectedChatId) return;
+            const input = document.getElementById('new-user-id');
+            const value = input.value.trim();
+            const userId = Number(value);
+            if (!userId || userId <= 0) {
+                tg.showAlert('Enter a valid user ID');
+                return;
+            }
+            try {
+                const response = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({chat_id: selectedChatId, init_data: initData, add_whitelist: userId})
+                });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || 'Failed to add user');
+                if (data.added) {
+                    currentWhitelist.push(userId);
+                    populateWhitelist(currentWhitelist);
+                    input.value = '';
+                    tg.showAlert('User added to whitelist');
+                } else {
+                    tg.showAlert('User is already whitelisted');
+                }
+            } catch (err) {
+                console.error(err);
+                tg.showAlert('Unable to add user');
+            }
+        }
+
+        async function removeUser(userId) {
+            if (!selectedChatId) return;
+            try {
+                const response = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({chat_id: selectedChatId, init_data: initData, remove_whitelist: userId})
+                });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || 'Failed to remove user');
+                if (data.removed) {
+                    currentWhitelist = currentWhitelist.filter(id => id !== userId);
+                    populateWhitelist(currentWhitelist);
+                    tg.showAlert('User removed from whitelist');
+                } else {
+                    tg.showAlert('User was not in whitelist');
+                }
+            } catch (err) {
+                console.error(err);
+                tg.showAlert('Unable to remove user');
+            }
+        }
+
+        function showScreen(screen) {
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('error-screen').classList.add('hidden');
+            document.getElementById('groups-screen').classList.add('hidden');
+            document.getElementById('settings-screen').classList.add('hidden');
+
+            if (screen === 'loading') {
+                document.getElementById('loading').classList.remove('hidden');
+                return;
+            }
+            if (screen === 'groups') {
+                document.getElementById('groups-screen').classList.remove('hidden');
+                return;
+            }
+            if (screen === 'settings') {
+                document.getElementById('settings-screen').classList.remove('hidden');
+                return;
+            }
+            if (screen === 'error') {
+                document.getElementById('error-screen').classList.remove('hidden');
+            }
+        }
+
+        function showError(message) {
+            document.getElementById('error-message').textContent = message;
+            showScreen('error');
+            document.getElementById('error-screen').classList.remove('hidden');
+        }
+
+        function escapeHtml(value) {
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        document.getElementById('back-button').addEventListener('click', () => {
+            selectedChatId = null;
+            showScreen('groups');
+        });
+        document.getElementById('save-settings').addEventListener('click', saveSettings);
+        document.getElementById('add-user').addEventListener('click', addUser);
+        document.getElementById('new-user-id').addEventListener('keypress', function (event) {
+            if (event.key === 'Enter') {
+                addUser();
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

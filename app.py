@@ -2,6 +2,7 @@ from telegram.ext import (
     Application,
     CommandHandler,
     MessageHandler,
+    CallbackQueryHandler,
     filters,
 )
 
@@ -11,9 +12,10 @@ from bot.commands import (
     start_command,
     help_command,
     settings_command,
-    set_command,
+    dashboard_command,
     setlog_command,
     whitelist_command,
+    button_callback,
 )
 from bot.group_messages import handle_group_messages
 
@@ -29,9 +31,11 @@ def main():
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("settings", settings_command))
-    app.add_handler(CommandHandler("set", set_command))
+    app.add_handler(CommandHandler("dashboard", dashboard_command))
     app.add_handler(CommandHandler("setlog", setlog_command))
     app.add_handler(CommandHandler("whitelist", whitelist_command))
+
+    app.add_handler(CallbackQueryHandler(button_callback))
 
     app.add_handler(
         MessageHandler(

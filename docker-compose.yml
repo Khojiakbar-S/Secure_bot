@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  securebot:
+    build: .
+    container_name: securebot
+    restart: unless-stopped
+    
+    # Load environment variables from .env file
+    env_file:
+      - .env
+    
+    # Environment variable overrides
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DB_PATH=/app/data/securebot.db
+    
+    # Mount volumes for persistent data
+    volumes:
+      # Persist SQLite database
+      - securebot_data:/app/data
+      # Optional: Mount logs if implemented
+      # - securebot_logs:/app/logs
+    
+    # Resource limits (optional but recommended for production)
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  securebot_data:
+    driver: local
