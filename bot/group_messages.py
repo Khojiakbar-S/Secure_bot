@@ -1,3 +1,6 @@
+import tempfile
+import os
+from pathlib import Path
 from telegram import Update
 from telegram.error import TelegramError
 from telegram.ext import ContextTypes
@@ -48,15 +51,24 @@ async def handle_group_messages(update: Update, context: ContextTypes.DEFAULT_TY
 
             file = await document.get_file()
 
-            path = f"/tmp/{document.file_unique_id}.apk"
+            # Create a temporary directory that works cross-platform
+            temp_dir = tempfile.gettempdir()
+            path = os.path.join(temp_dir, f"{document.file_unique_id}.apk")
 
             await file.download_to_drive(path)
 
-            from bot.apk_scanner import scan_apk_file
+            try:
+                from bot.apk_scanner import scan_apk_file
 
-            result = scan_apk_file(path)
+                result = scan_apk_file(path)
 
-            await message.reply_text(str(result))
+                await message.reply_text(str(result))
+            finally:
+                # Clean up the temporary file
+                try:
+                    os.remove(path)
+                except OSError:
+                    pass
   
     if chat.type == "private":
         return
@@ -72,7 +84,7 @@ async def handle_group_messages(update: Update, context: ContextTypes.DEFAULT_TY
     text = message.text or message.caption or ""
 
     if settings["scan_links"]:
-        link_result = scan_links_in_text(text)
+        link_result = await scan_links_in_text(text)
         if link_result:
             await process_link_result(update, context, settings, link_result)
 
@@ -108,7 +120,16 @@ async def process_link_result(
         else:
             await safe_reply_html(update, format_link_warning_for_group(result, full_name))
             action = "o‘chirish urinish bo‘ldi, lekin muvaffaqiyatsiz"
-
+        # Handle mute/ban actions if configured
+        if settings["mute_high_risk"] or settings["ban_high_risk"]:
+            await handle_user_restriction(
+                update,
+                chat,
+                user,
+                settings,
+                result,
+                full_name
+            )
     elif result["level"] == "MEDIUM" and settings["warn_medium"]:
         await safe_reply_html(update, format_link_warning_for_group(result, full_name))
         action = "ogohlantirish yuborildi"
@@ -126,3 +147,45 @@ async def process_link_result(
     )
     await send_log_message(context, log_chat_id, log_text)
 
+async def handle_user_restriction(
+    update: Update,
+    chat,
+    user,
+    settings: dict,
+    result: dict,
+    full_name: str,
+):
+    """Handle muting or banning a user for sharing high-risk content."""
+    from telegram.constants import ChatPermissions
+    
+    try:
+        if settings["ban_high_risk"]:
+            # Ban the user
+            await chat.ban_member(user.id)
+            await notify_chat_after_delete(
+                update,
+                (
+                    f"🚫 <b>User Banned</b>\n\n"
+                    f"User: <b>{full_name}</b>\n"
+                    f"Reason: Shared high-risk link\n"
+                    f"Risk Score: <b>{result['score']}</b>"
+                )
+            )
+        elif settings["mute_high_risk"]:
+            # Mute the user (restrict to text only, no media)
+            await chat.restrict_member(
+                user.id,
+                permissions=ChatPermissions(can_send_messages=False)
+            )
+            await notify_chat_after_delete(
+                update,
+                (
+                    f"🔇 <b>User Muted</b>\n\n"
+                    f"User: <b>{full_name}</b>\n"
+                    f"Reason: Shared high-risk link\n"
+                    f"Risk Score: <b>{result['score']}</b>"
+                )
+            )
+    except TelegramError as e:
+        # Log error but don't crash
+        pass
