@@ -26,6 +26,7 @@ The architecture combines a Telegram bot service with an `aiohttp` web server an
 - ✅ Dashboard restricted to Telegram private chats (DM only)
 - ✅ Dynamic group selector for admins managing multiple chats
 - ✅ Per-group settings stored securely in SQLite
+- ✅ Blacklist manager for blocked URLs via the dashboard
 - ✅ Zero-dependency frontend with Vanilla JS, HTML, and Tailwind CSS via CDN
 - ✅ Docker-ready deployment with persistent SQLite storage
 
@@ -37,8 +38,8 @@ SecureBot is designed as a hybrid Python service:
 
 - `main.py` starts the Telegram bot and launches the web server in a background thread.
 - `webapp.py` hosts the Mini App API and serves the dashboard UI from `index.html`.
-- `bot/database.py` stores chat settings, whitelists, and cached scan results in SQLite.
-- `bot/commands.py` implements bot commands, dashboard launch flow, and admin controls.
+- `bot/database.py` stores chat settings, whitelists, blacklists, and cached scan results in SQLite.
+- `bot/commands.py` implements bot commands, dashboard launch flow, blacklist controls, and admin features.
 - `index.html` provides a secure Web App UI for authorized admins.
 
 ### Data flow
@@ -167,4 +168,5 @@ The SQLite database is persisted using the `securebot_data` Docker volume at `/a
 - Replace screenshot placeholders with real dashboard images
 - Secure `WEB_APP_URL` with a production HTTPS endpoint
 - Add a `GOOGLE_SAFE_BROWSING_API_KEY` for enhanced link scanning
+- Use `/blacklist` by replying to a message containing a URL to block that link across the group
 - Confirm the bot has required Telegram admin permissions in groups

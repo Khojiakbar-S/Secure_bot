@@ -15,6 +15,7 @@ from bot.commands import (
     dashboard_command,
     setlog_command,
     whitelist_command,
+    blacklist_command,
     button_callback,
 )
 from bot.group_messages import handle_group_messages
@@ -34,6 +35,7 @@ def main():
     app.add_handler(CommandHandler("dashboard", dashboard_command))
     app.add_handler(CommandHandler("setlog", setlog_command))
     app.add_handler(CommandHandler("whitelist", whitelist_command))
+    app.add_handler(CommandHandler("blacklist", blacklist_command))
 
     app.add_handler(CallbackQueryHandler(button_callback))
 

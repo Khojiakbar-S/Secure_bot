@@ -17,6 +17,9 @@ from bot.database import (
     add_whitelist,
     remove_whitelist,
     list_whitelist,
+    add_blacklist,
+    remove_blacklist,
+    list_blacklist,
     get_statistics,
     list_group_chat_ids,
 )
@@ -119,11 +122,13 @@ class WebAppServer:
             chat_id_int = int(chat_id)
             settings = get_settings(chat_id_int)
             whitelist = list_whitelist(chat_id_int)
+            blacklist = list_blacklist(chat_id_int)
             stats = get_statistics()
 
             return web.json_response({
                 'settings': settings,
                 'whitelist': whitelist,
+                'blacklist': blacklist,
                 'stats': stats
             })
 
@@ -220,6 +225,18 @@ class WebAppServer:
                 user_id_to_remove = int(data['remove_whitelist'])
                 removed = remove_whitelist(chat_id_int, user_id_to_remove)
                 response_data['removed'] = removed
+
+            # Handle blacklist add
+            if 'add_blacklist' in data:
+                url_to_add = str(data['add_blacklist']).strip()
+                blacklisted = add_blacklist(chat_id_int, url_to_add)
+                response_data['blacklisted'] = blacklisted
+
+            # Handle blacklist remove
+            if 'remove_blacklist' in data:
+                url_to_remove = str(data['remove_blacklist']).strip()
+                removed_blacklist = remove_blacklist(chat_id_int, url_to_remove)
+                response_data['removed_blacklist'] = removed_blacklist
 
             return web.json_response(response_data)
 

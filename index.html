@@ -65,6 +65,10 @@
             margin: 0 auto;
         }
 
+        input.dashboard-input {
+            color: #333333;
+        }
+
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
@@ -208,10 +212,21 @@
                 <h3 class="text-lg font-semibold mb-4">Whitelist manager</h3>
                 <div class="space-y-4">
                     <div class="grid gap-2 sm:grid-cols-[1fr_auto]">
-                        <input id="new-user-id" type="number" placeholder="User ID" class="w-full rounded-3xl border border-slate-200 dark:border-slate-700 bg-surface px-4 py-3 text-sm text-slate-900 dark:text-slate-100 focus:outline-none">
+                        <input id="new-user-id" type="number" placeholder="User ID" class="dashboard-input w-full rounded-3xl border border-slate-200 dark:border-slate-700 bg-surface px-4 py-3 text-sm text-slate-900 dark:text-slate-100 focus:outline-none">
                         <button id="add-user" class="rounded-3xl button-primary px-4 py-3 text-sm font-semibold">Add</button>
                     </div>
                     <div id="whitelist-list" class="space-y-3"></div>
+                </div>
+            </div>
+
+            <div class="rounded-3xl card p-5">
+                <h3 class="text-lg font-semibold mb-4">Blacklist manager</h3>
+                <div class="space-y-4">
+                    <div class="grid gap-2 sm:grid-cols-[1fr_auto]">
+                        <input id="new-blacklist-url" type="text" placeholder="URL or link" class="dashboard-input w-full rounded-3xl border border-slate-200 dark:border-slate-700 bg-surface px-4 py-3 text-sm text-slate-900 dark:text-slate-100 focus:outline-none">
+                        <button id="add-blacklist" class="rounded-3xl button-primary px-4 py-3 text-sm font-semibold">Add</button>
+                    </div>
+                    <div id="blacklist-list" class="space-y-3"></div>
                 </div>
             </div>
         </div>
@@ -222,6 +237,7 @@
         const initData = tg.initData;
         let selectedChatId = null;
         let currentWhitelist = [];
+        let currentBlacklist = [];
 
         function init() {
             tg.ready();
@@ -308,9 +324,11 @@
                 if (!response.ok) throw new Error(data.error || 'Unable to load group data');
 
                 currentWhitelist = data.whitelist || [];
+                currentBlacklist = data.blacklist || [];
                 populateSettings(data.settings);
                 populateStats(data.stats);
                 populateWhitelist(currentWhitelist);
+                populateBlacklist(currentBlacklist);
                 showScreen('settings');
             } catch (err) {
                 showError(err.message || 'Failed to load group settings.');
@@ -348,6 +366,35 @@
                     <span class="text-sm font-mono">${userId}</span>
                     <button type="button" class="text-sm font-semibold text-red-600 dark:text-red-400" onclick="removeUser(${userId})">Remove</button>
                 `;
+                container.appendChild(card);
+            });
+        }
+
+        function populateBlacklist(list) {
+            const container = document.getElementById('blacklist-list');
+            container.innerHTML = '';
+
+            if (!list.length) {
+                container.innerHTML = '<div class="rounded-3xl border border-slate-200 dark:border-slate-700 p-4 text-sm text-muted">No blacklisted links yet.</div>';
+                return;
+            }
+
+            list.forEach(url => {
+                const card = document.createElement('div');
+                card.className = 'flex items-center justify-between rounded-3xl border border-slate-200 dark:border-slate-700 p-4';
+
+                const textEl = document.createElement('span');
+                textEl.className = 'break-all text-sm font-mono';
+                textEl.textContent = url;
+
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'text-sm font-semibold text-red-600 dark:text-red-400';
+                button.textContent = 'Remove';
+                button.addEventListener('click', () => removeBlacklist(url));
+
+                card.appendChild(textEl);
+                card.appendChild(button);
                 container.appendChild(card);
             });
         }
@@ -417,6 +464,59 @@
             } catch (err) {
                 console.error(err);
                 tg.showAlert('Unable to add user');
+            }
+        }
+
+        async function addBlacklist() {
+            if (!selectedChatId) return;
+            const input = document.getElementById('new-blacklist-url');
+            const url = input.value.trim();
+            if (!url) {
+                tg.showAlert('Enter a valid URL');
+                return;
+            }
+            try {
+                const response = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({chat_id: selectedChatId, init_data: initData, add_blacklist: url})
+                });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || 'Failed to add blacklist link');
+                if (data.blacklisted) {
+                    currentBlacklist.push(url);
+                    populateBlacklist(currentBlacklist);
+                    input.value = '';
+                    tg.showAlert('Link added to blacklist');
+                } else {
+                    tg.showAlert('Link is already blacklisted');
+                }
+            } catch (err) {
+                console.error(err);
+                tg.showAlert('Unable to add blacklist link');
+            }
+        }
+
+        async function removeBlacklist(url) {
+            if (!selectedChatId) return;
+            try {
+                const response = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({chat_id: selectedChatId, init_data: initData, remove_blacklist: url})
+                });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || 'Failed to remove blacklist link');
+                if (data.removed_blacklist) {
+                    currentBlacklist = currentBlacklist.filter(item => item !== url);
+                    populateBlacklist(currentBlacklist);
+                    tg.showAlert('Link removed from blacklist');
+                } else {
+                    tg.showAlert('Link was not found in blacklist');
+                }
+            } catch (err) {
+                console.error(err);
+                tg.showAlert('Unable to remove blacklist link');
             }
         }
 
@@ -490,6 +590,12 @@
         document.getElementById('new-user-id').addEventListener('keypress', function (event) {
             if (event.key === 'Enter') {
                 addUser();
+            }
+        });
+        document.getElementById('add-blacklist').addEventListener('click', addBlacklist);
+        document.getElementById('new-blacklist-url').addEventListener('keypress', function (event) {
+            if (event.key === 'Enter') {
+                addBlacklist();
             }
         });
 
