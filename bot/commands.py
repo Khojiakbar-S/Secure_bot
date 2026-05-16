@@ -1,12 +1,14 @@
 import logging
 import os
+import tempfile
+from pathlib import Path
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo, FSInputFile
 from telegram.constants import ChatType
 from telegram.ext import ContextTypes
 from telegram.error import BadRequest
 
-from config import WEB_APP_URL
+from config import WEB_APP_URL, BOT_OWNER_ID, DB_PATH
 
 logger = logging.getLogger(__name__)
 
@@ -365,6 +367,62 @@ async def whitelist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         removed = remove_whitelist(chat_id, target_user_id)
         await update.message.reply_html(whitelist_del_text(target_user_id, removed))
+
+
+async def backup_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != BOT_OWNER_ID:
+        await update.message.reply_text(NOT_ADMIN_TEXT)
+        return
+
+    db_path = Path(DB_PATH)
+    if not db_path.exists():
+        await update.message.reply_text("Database file not found.")
+        return
+
+    try:
+        db_input = FSInputFile(str(db_path))
+        await context.bot.send_document(
+            chat_id=BOT_OWNER_ID,
+            document=db_input,
+            filename=db_path.name,
+            caption="SecureBot database backup"
+        )
+        await update.message.reply_text("Database backup sent to the admin.")
+    except Exception as exc:
+        logging.exception("Failed to send database backup")
+        await update.message.reply_text("Failed to create or send the backup.")
+
+
+async def restore_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != BOT_OWNER_ID:
+        return
+
+    message = update.effective_message
+    if not message or not message.document:
+        return
+
+    caption = (message.caption or "").strip().lower()
+    if not caption.startswith("/restore"):
+        return
+
+    document = message.document
+    temp_file = Path(tempfile.gettempdir()) / f"securebot_restore_{document.file_unique_id}.db"
+    db_path = Path(DB_PATH)
+
+    try:
+        file = await document.get_file()
+        await file.download_to_drive(str(temp_file))
+        os.replace(str(temp_file), str(db_path))
+        await message.reply_text("Database successfully restored! ✅")
+    except Exception:
+        logging.exception("Failed to restore database from uploaded file")
+        await message.reply_text("Failed to restore database. Please try again.")
+    finally:
+        if temp_file.exists():
+            try:
+                temp_file.unlink()
+            except Exception:
+                pass
 
 
 async def blacklist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
