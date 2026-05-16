@@ -285,5 +285,8 @@ if __name__ == "__main__":
         print("BOT_TOKEN not found in environment variables")
         sys.exit(1)
 
-    server = create_web_server(BOT_TOKEN)
+    host = os.environ.get("WEB_HOST", "0.0.0.0")
+    port = int(os.environ.get("WEB_PORT", "8080"))
+
+    server = create_web_server(BOT_TOKEN, host=host, port=port)
     asyncio.run(server.start())
