@@ -27,6 +27,7 @@ The architecture combines a Telegram bot service with an `aiohttp` web server an
 - ✅ Dynamic group selector for admins managing multiple chats
 - ✅ Per-group settings stored securely in SQLite
 - ✅ Blacklist manager for blocked URLs via the dashboard
+- ✅ Manual database backup & restore via `/backup` and `/restore`
 - ✅ Zero-dependency frontend with Vanilla JS, HTML, and Tailwind CSS via CDN
 - ✅ Docker-ready deployment with persistent SQLite storage
 
@@ -169,4 +170,5 @@ The SQLite database is persisted using the `securebot_data` Docker volume at `/a
 - Secure `WEB_APP_URL` with a production HTTPS endpoint
 - Add a `GOOGLE_SAFE_BROWSING_API_KEY` for enhanced link scanning
 - Use `/blacklist` by replying to a message containing a URL to block that link across the group
+- Use `/backup` to download the SQLite database and `/restore` with a document caption to restore it
 - Confirm the bot has required Telegram admin permissions in groups

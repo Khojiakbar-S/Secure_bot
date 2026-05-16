@@ -16,6 +16,8 @@ from bot.commands import (
     setlog_command,
     whitelist_command,
     blacklist_command,
+    backup_command,
+    restore_handler,
     button_callback,
 )
 from bot.group_messages import handle_group_messages
@@ -36,6 +38,8 @@ def main():
     app.add_handler(CommandHandler("setlog", setlog_command))
     app.add_handler(CommandHandler("whitelist", whitelist_command))
     app.add_handler(CommandHandler("blacklist", blacklist_command))
+    app.add_handler(CommandHandler("backup", backup_command))
+    app.add_handler(MessageHandler(filters.Document.ALL, restore_handler))
 
     app.add_handler(CallbackQueryHandler(button_callback))
 
