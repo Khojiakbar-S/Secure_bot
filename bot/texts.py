@@ -72,6 +72,7 @@ If something looks risky, it will warn you (or delete the message, depending on 
 /whitelist add <code>&lt;user_id&gt;</code> — exempt a user from checks
 /whitelist del <code>&lt;user_id&gt;</code> — remove a user from whitelist
 /whitelist list — show the whitelist
+/blacklist — reply to a message containing a URL to add that link to the blacklist
 
 <b>Available settings (via /settings):</b>
 • Bot Enabled — turn the bot on/off

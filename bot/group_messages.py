@@ -5,8 +5,8 @@ from telegram import Update
 from telegram.error import TelegramError
 from telegram.ext import ContextTypes
 
-from bot.database import get_settings, is_whitelisted
-from bot.link_scanner import scan_links_in_text
+from bot.database import get_settings, is_whitelisted, is_blacklisted_url
+from bot.link_scanner import extract_urls, scan_links_in_text
 from bot.moderation import safe_reply_html, safe_delete_message, send_log_message
 from bot.texts import (
     format_link_warning_for_group,
@@ -82,6 +82,16 @@ async def handle_group_messages(update: Update, context: ContextTypes.DEFAULT_TY
         return
 
     text = message.text or message.caption or ""
+    urls = extract_urls(text)
+
+    if urls and any(is_blacklisted_url(chat.id, url) for url in urls):
+        deleted = await safe_delete_message(update)
+        if deleted:
+            await notify_chat_after_delete(
+                update,
+                "🗑 <b>Blacklisted link detected</b>\n\nThe message was deleted because it contained a link that has been added to the blacklist."
+            )
+        return
 
     if settings["scan_links"]:
         link_result = await scan_links_in_text(text)

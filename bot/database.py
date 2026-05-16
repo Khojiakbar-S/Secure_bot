@@ -47,6 +47,17 @@ def init_db():
         )
     """)
 
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS blacklist (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            chat_id INTEGER NOT NULL,
+            url TEXT NOT NULL,
+            normalized_url TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(chat_id, normalized_url)
+        )
+    """)
+
     conn.commit()
     conn.close()
 
@@ -189,6 +200,76 @@ def is_whitelisted(chat_id: int, user_id: int) -> bool:
     conn.close()
     return result
 
+def normalize_blacklist_url(url: str) -> str:
+    if not url:
+        return ""
+
+    normalized = url.strip().rstrip('.,!?;:')
+    if normalized.lower().startswith("www."):
+        normalized = "http://" + normalized
+    return normalized
+
+
+def add_blacklist(chat_id: int, url: str) -> bool:
+    normalized_url = normalize_blacklist_url(url)
+    if not normalized_url:
+        return False
+
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            "INSERT INTO blacklist (chat_id, url, normalized_url) VALUES (?, ?, ?)",
+            (chat_id, url.strip(), normalized_url)
+        )
+        conn.commit()
+        return True
+    except sqlite3.IntegrityError:
+        return False
+    finally:
+        conn.close()
+
+
+def remove_blacklist(chat_id: int, url: str) -> bool:
+    normalized_url = normalize_blacklist_url(url)
+    if not normalized_url:
+        return False
+
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        "DELETE FROM blacklist WHERE chat_id = ? AND normalized_url = ?",
+        (chat_id, normalized_url)
+    )
+    deleted = cur.rowcount > 0
+    conn.commit()
+    conn.close()
+    return deleted
+
+
+def list_blacklist(chat_id: int) -> list[str]:
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT url FROM blacklist WHERE chat_id = ? ORDER BY id", (chat_id,))
+    rows = cur.fetchall()
+    conn.close()
+    return [row["url"] for row in rows]
+
+
+def is_blacklisted_url(chat_id: int, url: str) -> bool:
+    normalized_url = normalize_blacklist_url(url)
+    if not normalized_url:
+        return False
+
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT 1 FROM blacklist WHERE chat_id = ? AND normalized_url = ?",
+        (chat_id, normalized_url)
+    )
+    result = cur.fetchone() is not None
+    conn.close()
+    return result
 
 # URL Cache Functions
 

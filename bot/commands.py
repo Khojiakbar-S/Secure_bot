@@ -14,9 +14,11 @@ from bot.database import (
     get_settings,
     update_setting,
     add_whitelist,
+    add_blacklist,
     remove_whitelist,
     list_whitelist,
 )
+from bot.link_scanner import extract_urls
 from bot.texts import (
     START_TEXT,
     HELP_TEXT,
@@ -363,3 +365,41 @@ async def whitelist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         removed = remove_whitelist(chat_id, target_user_id)
         await update.message.reply_html(whitelist_del_text(target_user_id, removed))
+
+
+async def blacklist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+
+    if not await is_admin(update, user_id):
+        await update.message.reply_text(NOT_ADMIN_TEXT)
+        return
+
+    message = update.message
+    if not message or not message.reply_to_message:
+        await update.message.reply_text(
+            "Please reply to the message containing the link and use /blacklist."
+        )
+        return
+
+    source_message = message.reply_to_message
+    text = source_message.text or source_message.caption or ""
+    urls = extract_urls(text)
+
+    if not urls:
+        await update.message.reply_text(
+            "No link found in the replied message. Please reply to a message that contains a URL."
+        )
+        return
+
+    url_to_blacklist = urls[0].strip()
+    added = add_blacklist(update.effective_chat.id, url_to_blacklist)
+
+    try:
+        await source_message.delete()
+    except Exception:
+        pass
+
+    if added:
+        await update.message.reply_text("✅ Link added to blacklist!")
+    else:
+        await update.message.reply_text("ℹ️ This link is already on the blacklist.")
