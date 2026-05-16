@@ -3,7 +3,7 @@ import os
 import tempfile
 from pathlib import Path
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo, FSInputFile
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo, InputFile
 from telegram.constants import ChatType
 from telegram.ext import ContextTypes
 from telegram.error import BadRequest
@@ -380,7 +380,7 @@ async def backup_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     try:
-        db_input = FSInputFile(str(db_path))
+        db_input = InputFile(str(db_path))
         await context.bot.send_document(
             chat_id=BOT_OWNER_ID,
             document=db_input,
