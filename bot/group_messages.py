@@ -4,6 +4,7 @@ from pathlib import Path
 from telegram import Update
 from telegram.error import TelegramError
 from telegram.ext import ContextTypes
+from bot.virustotal import check_file_hash_virustotal 
 
 from bot.database import get_settings, is_whitelisted, is_blacklisted_url
 from bot.link_scanner import extract_urls, scan_links_in_text
@@ -44,27 +45,69 @@ async def handle_group_messages(update: Update, context: ContextTypes.DEFAULT_TY
     document = message.document
 
     if document and settings["scan_apk"]:
-
         file_name = document.file_name or ""
 
         if file_name.lower().endswith(".apk"):
-
             file = await document.get_file()
 
-            # Create a temporary directory that works cross-platform
+            # Vaqtinchalik fayl yaratish
             temp_dir = tempfile.gettempdir()
             path = os.path.join(temp_dir, f"{document.file_unique_id}.apk")
-
             await file.download_to_drive(path)
 
             try:
                 from bot.apk_scanner import scan_apk_file
 
-                result = scan_apk_file(path)
+                # 1. Ichki evristik tekshiruv (Permissions va DEX)
+                local_result = scan_apk_file(path)
+                
+                # 2. Global VirusTotal tekshiruvi (Antiviruslar bazasi)
+                vt_result = await check_file_hash_virustotal(path)
+                
+                is_virus = False
+                reasons = list(local_result.get("reasons", []))
+                score = local_result.get("score", 0)
 
-                await message.reply_text(str(result))
+                if vt_result:
+                    malicious_engines = vt_result.get("malicious", 0)
+                    if malicious_engines > 0:
+                        is_virus = True
+                        score = max(score, min(40 + (malicious_engines * 15), 100))
+                        reasons.append(f"VirusTotal: {malicious_engines} ta antivirus buni virus deb tasdiqladi!")
+
+                # Agar evristika yoki VirusTotal yuqori xavf aniqlasa
+                if score >= 60 or is_virus:
+                    # Zararli faylni o'chiramiz
+                    await safe_delete_message(update)
+                    
+                    full_name = get_full_name(user)
+                    reasons_text = "\n".join([f"• {r}" for r in reasons[:4]])
+                    
+                    await notify_chat_after_delete(
+                        update,
+                        f"🗑 <b>Zararli APK fayl o‘chirildi!</b>\n\n"
+                        f"Foydalanuvchi: <b>{full_name}</b>\n"
+                        f"Fayl nomi: <code>{file_name}</code>\n"
+                        f"Xavf darajasi: <b>HIGH (Ball: {score})</b>\n\n"
+                        f"<b>Aniqlangan sabablar:</b>\n{reasons_text}"
+                    )
+                    
+                    # Log kanalga xabar yuborish (ixtiyoriy, agar tizimingizda bo'lsa)
+                    log_chat_id = settings.get("log_channel")
+                    if log_chat_id:
+                        from bot.moderation import send_log_message
+                        await send_log_message(
+                            context, 
+                            log_chat_id, 
+                            f"🛡 <b>SecureBot APK Log</b>\n\n<b>Guruh:</b> {chat.title}\n<b>User:</b> {full_name}\n<b>Fayl:</b> {file_name}\n<b>O'chirildi:</b> Ha"
+                        )
+                    return
+                else:
+                    # Agar fayl toza bo'lsa, foydalanuvchiga xabar berish (ixtiyoriy)
+                    await message.reply_html(f"✅ <b>Fayl tekshirildi (Xavfsiz):</b> <code>{file_name}</code>\nHech qanday virus aniqlanmadi.")
+
             finally:
-                # Clean up the temporary file
+                # Vaqtinchalik faylni tozalash
                 try:
                     os.remove(path)
                 except OSError:

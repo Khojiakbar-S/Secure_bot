@@ -4,6 +4,7 @@ import aiohttp
 from urllib.parse import urlparse
 
 from config import GOOGLE_SAFE_BROWSING_API_KEY
+from bot.virustotal import check_url_virustotal 
 from bot.database import get_cached_url, cache_url_result
 
 
@@ -240,10 +241,10 @@ def scan_single_url_heuristic(url: str) -> dict:
 
 
 async def scan_single_url(url: str) -> dict:
-    """Scan a single URL with caching and Google Safe Browsing fallback."""
+    """Scan a single URL with caching, Google Safe Browsing, and VirusTotal fallback."""
     normalized = normalize_url(url)
     
-    # Check cache first
+    # 1. Keshni tekshirish
     cached = get_cached_url(normalized)
     if cached:
         return {
@@ -256,10 +257,9 @@ async def scan_single_url(url: str) -> dict:
             "from_cache": True,
         }
     
-    # Try Google Safe Browsing API
+    # 2. Google Safe Browsing API tekshiruvi
     google_result = await check_google_safe_browsing(normalized)
     if google_result:
-        # Cache the result
         cache_url_result(normalized, google_result["score"], google_result["level"])
         return {
             "url": url,
@@ -270,10 +270,29 @@ async def scan_single_url(url: str) -> dict:
             "reasons": ["Flagged by Google Safe Browsing"],
         }
     
-    # Fallback to heuristic scanning
+    # 3. YANGI: VirusTotal API tekshiruvi
+    vt_stats = await check_url_virustotal(normalized)
+    if vt_stats and vt_stats != "scanning":
+        malicious = vt_stats.get("malicious", 0)
+        suspicious = vt_stats.get("suspicious", 0)
+        
+        if malicious > 0 or suspicious > 1:
+            # Agar antiviruslar zararli deb topsa, risk ballini hisoblaymiz
+            score = min(50 + (malicious * 15), 100)
+            level = "HIGH" if score >= 60 else "MEDIUM"
+            
+            cache_url_result(normalized, score, level)
+            return {
+                "url": url,
+                "normalized_url": normalized,
+                "domain": get_domain(normalized),
+                "score": score,
+                "level": level,
+                "reasons": [f"VirusTotal: {malicious} ta antivirus zararli deb aniqladi."],
+            }
+
+    # 4. Evristik tahlil (Muqobil variant)
     result = scan_single_url_heuristic(normalized)
-    
-    # Cache the heuristic result
     cache_url_result(normalized, result["score"], result["level"])
     
     return result
