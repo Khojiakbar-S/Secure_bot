@@ -19,6 +19,8 @@ WEB_APP_URL = getenv_str("WEB_APP_URL") or "https://swooned-refocus-varmint.ngro
 
 # Google Safe Browsing API
 GOOGLE_SAFE_BROWSING_API_KEY = getenv_str("GOOGLE_SAFE_BROWSING_API_KEY")
+# VirusTotal API Key 
+VIRUSTOTAL_API_KEY = getenv_str("VIRUSTOTAL_API_KEY")
 
 DEFAULT_SETTINGS = {
     "enabled": 1,
